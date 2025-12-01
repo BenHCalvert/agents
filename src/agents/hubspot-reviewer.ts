@@ -1,5 +1,6 @@
 import { BaseAgent } from '../BaseAgent.js';
 import { GeminiClient } from '../GeminiClient.js';
+import { SYSTEM_INSTRUCTION, buildPrompt } from './prompts/hubspot-reviewer.js';
 
 /**
  * HubSpot Deal Loss Analysis Agent
@@ -43,17 +44,10 @@ export class HubSpotReviewerAgent extends BaseAgent {
       }
 
       // Use Gemini to analyze the data
-      const prompt = `Analyze the following HubSpot lost deals data and identify the top 3-5 key reasons why deals are being lost. 
-      Provide actionable insights and recommendations.
-
-      Lost Deals Data:
-      ${JSON.stringify(lostDealsData, null, 2)}`;
+      const prompt = buildPrompt(lostDealsData);
 
       this.log('Analyzing data with Gemini...');
-      const analysis = await this.gemini.generateWithSystem(
-        'You are a sales analytics expert. Analyze deal loss data and provide clear, actionable insights.',
-        prompt
-      );
+      const analysis = await this.gemini.generateWithSystem(SYSTEM_INSTRUCTION, prompt);
 
       this.log('\n=== HubSpot Deal Loss Analysis ===');
       console.log(analysis);

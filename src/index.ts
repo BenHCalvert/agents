@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import dotenv from 'dotenv';
 import { HubSpotReviewerAgent } from './agents/hubspot-reviewer.js';
+import { CalendarAssistantAgent } from './agents/calendar-assistant.js';
 import { BaseAgent } from './BaseAgent.js';
 
 dotenv.config();
@@ -12,6 +13,7 @@ const program = new Command();
 // Registry of available agents
 const agents: Map<string, () => BaseAgent> = new Map([
   ['hubspot-reviewer', () => new HubSpotReviewerAgent()],
+  ['calendar-assistant', () => new CalendarAssistantAgent()],
   // Add more agents here as you create them
 ]);
 
