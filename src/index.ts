@@ -11,11 +11,10 @@ dotenv.config();
 const program = new Command();
 
 // Registry of available agents
-const agents: Map<string, () => BaseAgent> = new Map([
-  ['hubspot-reviewer', () => new HubSpotReviewerAgent()],
-  ['calendar-assistant', () => new CalendarAssistantAgent()],
-  // Add more agents here as you create them
-]);
+const agents = new Map<string, () => BaseAgent>();
+agents.set('hubspot-reviewer', () => new HubSpotReviewerAgent());
+agents.set('calendar-assistant', () => new CalendarAssistantAgent());
+// Add more agents here as you create them
 
 program
   .name('agents')
