@@ -55,6 +55,7 @@ async function getRefreshToken() {
               <body>
                 <h1>✅ Authorization successful!</h1>
                 <p>You can close this window and return to the terminal.</p>
+                <p>Thanks for being awesome.</p>
               </body>
             </html>
           `);
