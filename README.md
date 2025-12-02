@@ -6,12 +6,13 @@ A simple TypeScript repository for multiple AI agents using Google Gemini. Agent
 
 ```
 src/
-├── BaseAgent.ts             # Abstract base class for all agents
-├── GeminiClient.ts          # Google Gemini API wrapper
-├── google.ts                # Google API helpers (Gmail & Calendar)
-├── agents/                  # Agent implementations
-│   └── hubspot-reviewer.ts  # HubSpot deal loss analysis agent
-└── index.ts                 # CLI entry point
+├── BaseAgent.ts                # Abstract base class for all agents
+├── GeminiClient.ts             # Google Gemini API wrapper
+├── google.ts                   # Google API helpers (Gmail & Calendar)
+├── agents/                     # Agent implementations
+│   └── calendar-assistant.ts   # Chief of Staff that provides calendar feedback and actionable next steps
+│   └── hubspot-reviewer.ts     # HubSpot deal loss analysis agent [WIP]
+└── index.ts                    # CLI entry point
 ```
 
 ## Setup
@@ -53,7 +54,7 @@ npm run dev run <agent-name>
 
 ### Example
 ```bash
-npm run dev run hubspot-reviewer
+npm run dev run calendar-assistant
 ```
 
 ## Creating a New Agent
