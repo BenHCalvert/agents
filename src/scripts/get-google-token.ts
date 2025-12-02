@@ -10,9 +10,17 @@ const SCOPES = [
 ];
 
 async function getRefreshToken() {
-  const clientId = process.env.GOOGLE_CLIENT_ID || '26403264960-52smk51t4o87a2d0fbl9aajfjf1d5tht.apps.googleusercontent.com';
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
-  const redirectUri = 'http://localhost:3000/oauth2callback';
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('GOOGLE_CLIENT_ID environment variable is required. Please add it to your .env file.');
+  }
+
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientSecret) {
+    throw new Error('GOOGLE_CLIENT_SECRET environment variable is required. Please add it to your .env file.');
+  }
+
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/oauth2callback';
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 

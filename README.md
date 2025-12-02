@@ -36,6 +36,11 @@ HUBSPOT_API_KEY=your_hubspot_api_key_here
 npm run build
 ```
 
+4. Get a Google access and refresh token, add them to the `.env` file
+```bash
+npm run get-google-token
+```
+
 ## Usage
 
 ### List available agents
