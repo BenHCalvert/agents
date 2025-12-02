@@ -10,9 +10,20 @@ src/
 ├── GeminiClient.ts             # Google Gemini API wrapper
 ├── google.ts                   # Google API helpers (Gmail & Calendar)
 ├── agents/                     # Agent implementations
-│   └── calendar-assistant.ts   # Chief of Staff that provides calendar feedback and actionable next steps
-│   └── email-assistant.ts      # Triages, labels and drafts replies (but doesn't send) to emails
-│   └── hubspot-reviewer.ts     # HubSpot deal loss analysis agent [WIP]
+│   ├── calendar-assistant.ts   # Chief of Staff that provides calendar feedback and actionable next steps
+│   ├── email-assistant.ts      # AI Chief of Staff that triages, labels, and drafts replies to emails
+│   ├── customer-intelligence.ts # Analyzes Jira ticket data to generate customer intelligence reports
+│   ├── hubspot-reviewer.ts     # HubSpot deal loss analysis agent [WIP]
+│   └── prompts/                # Prompt templates for agents
+│       ├── calendar-assistant.ts
+│       ├── email-assistant.ts
+│       ├── customer-intelligence.ts
+│       └── hubspot-reviewer.ts
+├── utils/                      # Utility functions
+│   └── csv-reader.ts          # CSV parsing utilities for Jira ticket data
+├── scripts/                    # Utility scripts
+│   ├── get-google-token.ts    # OAuth token setup script
+│   └── list-gemini-models.ts  # List available Gemini models
 └── index.ts                    # CLI entry point
 ```
 
@@ -29,7 +40,19 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GOOGLE_CLIENT_ID=your_google_client_id_here
 GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 GOOGLE_REDIRECT_URI=http://localhost:3000/oauth2callback
-HUBSPOT_API_KEY=your_hubspot_api_key_here
+GOOGLE_ACCESS_TOKEN=your_access_token_here
+GOOGLE_REFRESH_TOKEN=your_refresh_token_here
+
+# Optional: Email Assistant configuration
+EMAIL_VIP_DOMAINS=example.com,company.com
+EMAIL_VIP_SENDERS=boss@example.com,family@example.com
+EMAIL_WORK_HOURS_START=9
+EMAIL_WORK_HOURS_END=17
+
+# Optional: Customer Intelligence configuration
+JIRA_DATA_DIR=./data/jira
+JIRA_REPORTS_DIR=./reports
+JIRA_LOOKBACK_WEEKS=4
 ```
 
 3. Build the project:
@@ -58,9 +81,16 @@ npm start run <agent-name>
 npm run dev run <agent-name>
 ```
 
-### Example
+### Examples
 ```bash
+# Run calendar assistant
 npm run dev run calendar-assistant
+
+# Run email assistant
+npm run dev run email-assistant
+
+# Run customer intelligence agent
+npm run dev run customer-intelligence
 ```
 
 ## Creating a New Agent
@@ -101,6 +131,25 @@ const agents: Map<string, () => BaseAgent> = new Map([
 
 ## Available Agents
 
+### calendar-assistant
+Chief of Staff that analyzes your calendar to ensure you're spending time on the most important things, identifies meetings that should be delegated, and checks that all meetings have conferencing links or locations.
+
+### email-assistant
+AI Chief of Staff that manages your inbox by:
+- **Phase 1: Ruthless Triage** - Automatically archives/labels noise (marketing, system notifications)
+- **Phase 2: The Drafter** - Creates draft replies for important emails (never sends automatically)
+- **Phase 3: The Watchman** - Monitors latency, checks meeting links, flags spiraling threads
+
+Requires Gmail API access with `gmail.modify`, `gmail.compose`, and `gmail.labels` scopes.
+
+### customer-intelligence
+Analyzes Jira ticket data from CSV files to generate customer intelligence reports with:
+- **Quantitative Signals** - Ticket counts, trends, volume percentages
+- **Qualitative Themes** - AI-analyzed patterns and pain points
+- **Representative Quotes** - Compelling customer feedback with context
+
+Reads CSV files from `./data/jira/` (configurable via `JIRA_DATA_DIR`). Expects files named `bugs-YYYY-MM-DD.csv` and `requests-YYYY-MM-DD.csv`. Reports are saved to `./reports/` directory.
+
 ### hubspot-reviewer
 Reviews HubSpot data to identify key reasons for deal losses. Currently a placeholder - HubSpot API integration to be implemented.
 
@@ -113,5 +162,7 @@ Reviews HubSpot data to identify key reasons for deal losses. Currently a placeh
 ## Notes
 
 - All agents run manually via CLI - no automatic scheduling
-- Google OAuth integration is set up but requires OAuth flow implementation for Gmail/Calendar access
+- Google OAuth integration is set up for Gmail and Calendar access
+- The email-assistant requires Gmail API scopes: `gmail.modify`, `gmail.compose`, and `gmail.labels`
+- Customer intelligence agent reads CSV files - download Jira ticket exports weekly
 - Future agents can be added by following the pattern in `src/agents/`
