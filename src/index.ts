@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import dotenv from 'dotenv';
 import { HubSpotReviewerAgent } from './agents/hubspot-reviewer.js';
 import { CalendarAssistantAgent } from './agents/calendar-assistant.js';
+import { EmailAssistantAgent } from './agents/email-assistant.js';
 import { BaseAgent } from './BaseAgent.js';
 
 dotenv.config();
@@ -14,6 +15,7 @@ const program = new Command();
 const agents = new Map<string, () => BaseAgent>();
 agents.set('hubspot-reviewer', () => new HubSpotReviewerAgent());
 agents.set('calendar-assistant', () => new CalendarAssistantAgent());
+agents.set('email-assistant', () => new EmailAssistantAgent());
 // Add more agents here as you create them
 
 program

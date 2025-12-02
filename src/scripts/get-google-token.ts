@@ -7,6 +7,9 @@ dotenv.config();
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.modify', // For archiving and labeling emails
+  'https://www.googleapis.com/auth/gmail.compose', // For creating drafts
+  'https://www.googleapis.com/auth/gmail.labels', // For creating labels
 ];
 
 async function getRefreshToken() {
