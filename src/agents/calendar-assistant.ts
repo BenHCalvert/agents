@@ -26,9 +26,11 @@ export class CalendarAssistantAgent extends BaseAgent {
     this.log('Starting calendar analysis...');
 
     try {
-      // Fetch upcoming calendar events
-      this.log('Fetching calendar events...');
-      const events = await getCalendarEvents(50); // Get next 50 events
+      // Fetch upcoming calendar events for the next week
+      this.log('Fetching calendar events for the next week...');
+      const oneWeekFromNow = new Date();
+      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+      const events = await getCalendarEvents(oneWeekFromNow.toISOString());
 
       if (events.length === 0) {
         this.log('No upcoming calendar events found.');

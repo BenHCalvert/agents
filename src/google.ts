@@ -78,16 +78,24 @@ export async function readEmails(maxResults: number = 10) {
 
 /**
  * Helper to get calendar events
+ * @param timeMax - Optional end date/time (ISO string). If not provided, fetches all future events up to maxResults
+ * @param maxResults - Maximum number of results (default: 250)
  */
-export async function getCalendarEvents(maxResults: number = 10) {
+export async function getCalendarEvents(timeMax?: string, maxResults: number = 250) {
   const calendar = await getCalendarClient();
-  const response = await calendar.events.list({
+  const params: any = {
     calendarId: 'primary',
     timeMin: new Date().toISOString(),
     maxResults,
     singleEvents: true,
     orderBy: 'startTime',
-  });
+  };
+  
+  if (timeMax) {
+    params.timeMax = timeMax;
+  }
+  
+  const response = await calendar.events.list(params);
   return response.data.items || [];
 }
 
