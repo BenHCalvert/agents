@@ -11,6 +11,7 @@ src/
 ├── google.ts                   # Google API helpers (Gmail & Calendar)
 ├── agents/                     # Agent implementations
 │   └── calendar-assistant.ts   # Chief of Staff that provides calendar feedback and actionable next steps
+│   └── email-assistant.ts      # Triages, labels and drafts replies (but doesn't send) to emails
 │   └── hubspot-reviewer.ts     # HubSpot deal loss analysis agent [WIP]
 └── index.ts                    # CLI entry point
 ```
@@ -36,7 +37,7 @@ HUBSPOT_API_KEY=your_hubspot_api_key_here
 npm run build
 ```
 
-4. Get a Google access and refresh token, add them to the `.env` file
+4. Get a Google access and refresh token, add them to the `.env` file. Follow the instructions in the terminal.
 ```bash
 npm run get-google-token
 ```
