@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "get-google-token": "tsx src/scripts/get-google-token.ts",
+    "list-gemini-models": "tsx src/scripts/list-gemini-models.ts"
   },
   "keywords": ["ai", "agents", "gemini"],
   "author": "",

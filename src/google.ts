@@ -10,9 +10,7 @@ dotenv.config();
 let authClient: ReturnType<typeof google.auth.fromJSON> | null = null;
 
 /**
- * Initialize Google OAuth2 client
- * Note: This is a placeholder - you'll need to implement OAuth flow
- * See: https://developers.google.com/identity/protocols/oauth2
+ * Initialize Google OAuth2 client with credentials from .env
  */
 export function initGoogleAuth() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -24,6 +22,29 @@ export function initGoogleAuth() {
   }
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+
+  // Set credentials from .env if available
+  const accessToken = process.env.GOOGLE_ACCESS_TOKEN;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!refreshToken || refreshToken.trim() === '') {
+    throw new Error(
+      'GOOGLE_REFRESH_TOKEN is required in .env file.\n' +
+      'Run "npm run get-google-token" to get your refresh token.'
+    );
+  }
+
+  // Set credentials - refresh token is required, access token is optional (will be refreshed)
+  const credentials: { refresh_token: string; access_token?: string } = {
+    refresh_token: refreshToken,
+  };
+
+  if (accessToken && accessToken.trim() !== '') {
+    credentials.access_token = accessToken;
+  }
+
+  oauth2Client.setCredentials(credentials);
+
   return oauth2Client;
 }
 
@@ -32,8 +53,6 @@ export function initGoogleAuth() {
  */
 export async function getGmailClient() {
   const auth = initGoogleAuth();
-  // TODO: Set credentials from OAuth flow or service account
-  // auth.setCredentials({ access_token: '...' });
   return google.gmail({ version: 'v1', auth });
 }
 
@@ -42,8 +61,6 @@ export async function getGmailClient() {
  */
 export async function getCalendarClient() {
   const auth = initGoogleAuth();
-  // TODO: Set credentials from OAuth flow or service account
-  // auth.setCredentials({ access_token: '...' });
   return google.calendar({ version: 'v3', auth });
 }
 
