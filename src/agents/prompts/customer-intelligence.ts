@@ -120,6 +120,24 @@ function buildStratifiedSample(bugs: JiraTicket[], requests: JiraTicket[], limit
   return result;
 }
 
+/**
+ * Extract "+1" endorsements from comments.
+ * CSMs often add comments like "+1 d1226 - Reynold School District" to signal
+ * additional customer demand. Returns a count and sample of endorsements per ticket.
+ */
+function extractEndorsements(ticket: JiraTicket): { count: number; samples: string[] } {
+  const endorsementPattern = /\+1[^a-zA-Z0-9]|also requesting|same request|this as well|us too/i;
+  const endorsements = ticket.comments.filter(c => endorsementPattern.test(c));
+  return {
+    count: endorsements.length,
+    samples: endorsements.slice(0, 3).map(c => {
+      // Strip the Jira comment metadata prefix (date;authorId;text)
+      const parts = c.split(';');
+      return parts.length >= 3 ? parts.slice(2).join(';').substring(0, 200) : c.substring(0, 200);
+    }),
+  };
+}
+
 export function buildQualitativeAnalysisPrompt(
   bugs: JiraTicket[],
   requests: JiraTicket[]
@@ -127,14 +145,25 @@ export function buildQualitativeAnalysisPrompt(
   const limit = 500;
   const sample = buildStratifiedSample(bugs, requests, limit);
 
-  const ticketData = sample.map(ticket => ({
-    type: ticket.type,
-    title: ticket.title,
-    description: ticket.description.substring(0, 500),
-    priority: ticket.priority,
-    customer: ticket.customer || 'Unknown',
-    arr: ticket.arr,
-  }));
+  const ticketData = sample.map(ticket => {
+    const endorsements = extractEndorsements(ticket);
+    return {
+      type: ticket.type,
+      title: ticket.title,
+      description: ticket.description.substring(0, 500),
+      priority: ticket.priority,
+      customer: ticket.customer || 'Unknown',
+      arr: ticket.arr,
+      ...(endorsements.count > 0 ? {
+        endorsementCount: endorsements.count,
+        endorsementSamples: endorsements.samples,
+      } : {}),
+    };
+  });
+
+  // Compute total endorsements across all tickets (not just sampled)
+  const allTickets = [...bugs, ...requests];
+  const totalEndorsements = allTickets.reduce((sum, t) => sum + extractEndorsements(t).count, 0);
 
   return `Analyze customer feedback from Jira tickets to identify qualitative themes and patterns.
 
@@ -144,6 +173,9 @@ Analyze ${sample.length} tickets (from ${bugs.length} bugs and ${requests.length
 2. Feature request themes
 3. Customer sentiment patterns
 4. Priority patterns (what customers care most about)
+5. Demand signals from "+1" endorsements (CSMs add these to indicate additional customers want the same thing)
+
+Note: ${totalEndorsements} "+1" endorsement comments were found across all tickets. Tickets with endorsements have endorsementCount and endorsementSamples fields — these indicate multiple customers want the same feature or are affected by the same bug. Weigh these heavily when assessing demand.
 
 Ticket Data:
 ${JSON.stringify(ticketData)}
@@ -156,7 +188,8 @@ Provide analysis in this JSON format:
       "description": "What this theme represents",
       "frequency": "X% of mentions",
       "ticketTypes": ["bug" | "request"],
-      "examples": ["Example ticket titles"]
+      "examples": ["Example ticket titles"],
+      "endorsements": "Number of +1 endorsements across tickets in this theme"
     }
   ],
   "painPoints": [
@@ -171,7 +204,8 @@ Provide analysis in this JSON format:
     {
       "request": "Feature request description",
       "frequency": "X% of requests",
-      "value": "Business value or use case"
+      "value": "Business value or use case",
+      "endorsements": "Number of +1 endorsements indicating multi-customer demand"
     }
   ],
   "insights": ["Key qualitative insights"]
@@ -186,25 +220,39 @@ export function buildQuotesPrompt(
   const allTickets = [...bugs, ...requests]
     .filter(t => t.description && t.description.length > 20)
     .sort((a, b) => (b.arr || 0) - (a.arr || 0))
-    .slice(0, 100); // Top 100 by ARR for broader coverage
+    .slice(0, 100);
 
-  const quotesData = allTickets.map(ticket => ({
-    type: ticket.type,
-    title: ticket.title,
-    description: ticket.description.substring(0, 300),
-    customer: ticket.customer || 'Unknown',
-    account: ticket.account || 'Unknown',
-    arr: ticket.arr,
-    priority: ticket.priority,
-  }));
+  const quotesData = allTickets.map(ticket => {
+    // Include comment excerpts — these often contain direct customer feedback
+    // and CSM "+1" endorsements with district/customer names
+    const commentExcerpts = ticket.comments
+      .filter(c => c.length > 10)
+      .slice(0, 5)
+      .map(c => {
+        const parts = c.split(';');
+        return parts.length >= 3 ? parts.slice(2).join(';').substring(0, 200) : c.substring(0, 200);
+      });
+
+    return {
+      type: ticket.type,
+      title: ticket.title,
+      description: ticket.description.substring(0, 300),
+      customer: ticket.customer || 'Unknown',
+      account: ticket.account || 'Unknown',
+      arr: ticket.arr,
+      priority: ticket.priority,
+      ...(commentExcerpts.length > 0 ? { comments: commentExcerpts } : {}),
+    };
+  });
 
   return `Extract representative customer quotes from Jira tickets.
 
 Focus on:
-- Compelling, specific feedback
+- Compelling, specific feedback from descriptions AND comments
 - High-value customers (prioritize by ARR if available)
 - Diverse customer segments
 - Both bugs and feature requests
+- "+1" endorsements in comments that name additional affected customers/districts
 
 Ticket Data:
 ${JSON.stringify(quotesData)}
@@ -213,12 +261,13 @@ Extract 5-10 representative quotes in this JSON format:
 {
   "quotes": [
     {
-      "quote": "Exact quote from customer",
+      "quote": "Exact quote from customer (from description or comments)",
       "customer": "Customer name",
       "account": "Account/company name",
       "arr": ARR value if available,
       "type": "bug" | "request",
-      "context": "Brief context about the quote"
+      "context": "Brief context about the quote",
+      "additionalCustomers": ["Other customers mentioned in +1 endorsements, if any"]
     }
   ]
 }`;

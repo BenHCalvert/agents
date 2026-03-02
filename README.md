@@ -25,6 +25,8 @@ src/
 │   ├── get-google-token.ts    # OAuth token setup script
 │   └── list-gemini-models.ts  # List available Gemini models
 └── index.ts                    # CLI entry point
+scripts/
+└── preprocess-jira-csv.py      # Preprocesses raw Jira CSV exports for customer-intelligence
 ```
 
 ## Setup
@@ -146,9 +148,19 @@ Requires Gmail API access with `gmail.modify`, `gmail.compose`, and `gmail.label
 Analyzes Jira ticket data from CSV files to generate customer intelligence reports with:
 - **Quantitative Signals** - Ticket counts, trends, volume percentages
 - **Qualitative Themes** - AI-analyzed patterns and pain points
+- **+1 Endorsement Detection** - Identifies CSM "+1" comments that signal multi-customer demand
 - **Representative Quotes** - Compelling customer feedback with context
 
 Reads CSV files from `./data/jira/` (configurable via `JIRA_DATA_DIR`). Expects files named `bugs-YYYY-MM-DD.csv` and `requests-YYYY-MM-DD.csv`. Reports are saved to `./reports/` directory.
+
+**Preprocessing Jira exports (recommended):** Raw Jira CSV exports contain 600+ columns, most of which are unused. Run the preprocessing script to strip them down to the ~60 useful columns and consolidate the many repeated Comment columns into a single field:
+
+```bash
+# Preprocess raw exports from Jira before running the agent
+npm run preprocess-csv -- ./data/jira ~/Downloads/bugs-YYYY-MM-DD.csv ~/Downloads/requests-YYYY-MM-DD.csv
+```
+
+This typically reduces file size by 30-50% and ensures comment data (including "+1" endorsements) is properly consolidated. Without preprocessing, the agent still works but will use more memory and may lose comment data from raw Jira exports that spread comments across 40-100 duplicate columns.
 
 ### hubspot-reviewer
 Reviews HubSpot data to identify key reasons for deal losses. Currently a placeholder - HubSpot API integration to be implemented.
@@ -164,5 +176,5 @@ Reviews HubSpot data to identify key reasons for deal losses. Currently a placeh
 - All agents run manually via CLI - no automatic scheduling
 - Google OAuth integration is set up for Gmail and Calendar access
 - The email-assistant requires Gmail API scopes: `gmail.modify`, `gmail.compose`, and `gmail.labels`
-- Customer intelligence agent reads CSV files - download Jira ticket exports weekly
+- Customer intelligence agent reads CSV files - download Jira ticket exports and preprocess them before running
 - Future agents can be added by following the pattern in `src/agents/`

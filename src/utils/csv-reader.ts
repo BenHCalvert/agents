@@ -68,16 +68,46 @@ function parseCSVLine(line: string): string[] {
 }
 
 /**
- * Parse CSV content into array of objects
+ * Disambiguate duplicate header names by appending _1, _2, etc.
+ * Repeated "Comment" columns become "comment_1", "comment_2", etc.
+ */
+function disambiguateHeaders(headers: string[]): string[] {
+  const counts = new Map<string, number>();
+  return headers.map(h => {
+    const lower = h.toLowerCase().trim();
+    const count = (counts.get(lower) || 0) + 1;
+    counts.set(lower, count);
+    return count > 1 ? `${lower}_${count}` : lower;
+  });
+}
+
+/**
+ * Parse CSV content into array of objects.
+ * Handles duplicate column names by disambiguating them.
  */
 function parseCSV(content: string): Record<string, string>[] {
   const lines = content.split('\n').filter(line => line.trim());
   if (lines.length === 0) return [];
 
-  // Parse header
-  const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
-  
-  // Parse data rows
+  const rawHeaders = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+  const headers = disambiguateHeaders(parseCSVLine(lines[0]));
+
+  // Track which raw header names had duplicates so we can consolidate them
+  const duplicateGroups = new Map<string, string[]>();
+  const seen = new Map<string, number>();
+  for (const h of rawHeaders) {
+    seen.set(h, (seen.get(h) || 0) + 1);
+  }
+  for (const [name, count] of seen) {
+    if (count > 1) {
+      const disambiguated = headers
+        .map((h, i) => ({ h, i }))
+        .filter(({ h }) => h === name || h.startsWith(name + '_'))
+        .map(({ h }) => h);
+      duplicateGroups.set(name, disambiguated);
+    }
+  }
+
   const rows: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]);
@@ -87,6 +117,21 @@ function parseCSV(content: string): Record<string, string>[] {
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
     });
+
+    // For each group of duplicate columns, produce a consolidated key
+    // e.g. comment_1..comment_N -> "comments_all" with non-empty values joined
+    for (const [baseName, disambiguatedNames] of duplicateGroups) {
+      const consolidatedKey = `${baseName}_all`;
+      if (!(consolidatedKey in row)) {
+        const parts = disambiguatedNames
+          .map(dn => row[dn] || '')
+          .filter(v => v.trim().length > 0);
+        if (parts.length > 0) {
+          row[consolidatedKey] = parts.join('\n---\n');
+        }
+      }
+    }
+
     rows.push(row);
   }
 
@@ -94,13 +139,24 @@ function parseCSV(content: string): Record<string, string>[] {
 }
 
 /**
- * Normalize column names to handle variations
+ * Normalize column names to handle variations.
+ * Tries exact match first across all candidates, then falls back to substring.
  */
 function getColumnValue(row: Record<string, string>, possibleNames: string[]): string {
+  // Pass 1: exact match (most precise)
   for (const name of possibleNames) {
     const lowerName = name.toLowerCase();
     for (const key in row) {
-      if (key.toLowerCase() === lowerName || key.toLowerCase().includes(lowerName)) {
+      if (key.toLowerCase() === lowerName) {
+        return row[key] || '';
+      }
+    }
+  }
+  // Pass 2: substring match (fuzzy fallback)
+  for (const name of possibleNames) {
+    const lowerName = name.toLowerCase();
+    for (const key in row) {
+      if (key.toLowerCase().includes(lowerName)) {
         return row[key] || '';
       }
     }
@@ -136,15 +192,18 @@ export function parseJiraTicket(row: Record<string, string>, type: 'bug' | 'requ
     }
   }
 
-  // Try to get comments
-  const commentsStr = getColumnValue(row, ['comments', 'comment', 'all comments']);
+  // Get comments: prefer the consolidated "comment_all" field from duplicate columns,
+  // then fall back to "comments" (the pre-processed single column).
+  const consolidatedComments = row['comment_all'] || '';
+  const singleComments = getColumnValue(row, ['comments', 'comment', 'all comments']);
+  const commentsStr = consolidatedComments || singleComments;
   if (commentsStr) {
-    ticket.comments = commentsStr.split(/\n\n|\r\n\r\n/).filter(c => c.trim());
+    ticket.comments = commentsStr.split(/\n---\n|\n\n|\r\n\r\n/).filter(c => c.trim());
   }
 
-  // Copy all other fields
+  // Copy useful extra fields, skip the many disambiguated duplicate columns
   Object.keys(row).forEach(key => {
-    if (!(key in ticket)) {
+    if (!(key in ticket) && !/_\d+$/.test(key) && !key.endsWith('_all')) {
       ticket[key] = row[key];
     }
   });
@@ -152,13 +211,40 @@ export function parseJiraTicket(row: Record<string, string>, type: 'bug' | 'requ
   return ticket;
 }
 
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+// Jira exports dates as "DD/Mon/YY h:mm AM" or "DD/Mon/YY h:mm PM"
+const JIRA_DATE_RE = /^(\d{1,2})\/([A-Za-z]{3})\/(\d{2,4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?$/i;
+
 /**
- * Parse date string to Date object
+ * Parse date string to Date object.
+ * Handles Jira's DD/Mon/YY h:mm AM/PM format as well as ISO and common formats.
  */
 function parseDate(dateStr: string): Date {
   if (!dateStr) return new Date();
+
+  // Try Jira format first (most common in our exports): "27/Feb/26 2:51 PM"
+  const jiraMatch = dateStr.trim().match(JIRA_DATE_RE);
+  if (jiraMatch) {
+    const day = parseInt(jiraMatch[1], 10);
+    const month = MONTH_MAP[jiraMatch[2].toLowerCase()];
+    let year = parseInt(jiraMatch[3], 10);
+    if (year < 100) year += 2000; // 26 -> 2026
+    let hours = parseInt(jiraMatch[4], 10);
+    const minutes = parseInt(jiraMatch[5], 10);
+    const ampm = jiraMatch[6]?.toUpperCase();
+
+    if (month !== undefined) {
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      return new Date(year, month, day, hours, minutes);
+    }
+  }
   
-  // Try ISO format first
+  // Try ISO format
   const isoDate = new Date(dateStr);
   if (!isNaN(isoDate.getTime())) {
     return isoDate;
