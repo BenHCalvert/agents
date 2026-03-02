@@ -71,7 +71,8 @@ export class CustomerIntelligenceAgent extends BaseAgent {
 
       // Phase 5: Report Generation
       this.log('\n=== Phase 5: Generating Intelligence Report ===');
-      const reportPath = await this.generateReport(quantitative, qualitative, quotes);
+      const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const reportPath = await this.generateReport(quantitative, qualitative, quotes, reportDate);
 
       this.log(`\n✅ Customer Intelligence Report generated: ${reportPath}`);
       this.log('\n=== Analysis Complete ===\n');
@@ -204,11 +205,12 @@ export class CustomerIntelligenceAgent extends BaseAgent {
   private async generateReport(
     quantitative: any,
     qualitative: any,
-    quotes: any
+    quotes: any,
+    reportDate: string
   ): Promise<string> {
     this.log('Generating final intelligence report...');
 
-    const prompt = buildReportPrompt(quantitative, qualitative, quotes);
+    const prompt = buildReportPrompt(quantitative, qualitative, quotes, reportDate);
     const report = await this.gemini.generateWithSystem(SYSTEM_INSTRUCTION, prompt);
 
     // Ensure reports directory exists

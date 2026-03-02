@@ -194,6 +194,45 @@ function getWeekIdentifier(date: Date): string {
 }
 
 /**
+ * Determine ticket type from filename, with fallback to a row's 'type' column.
+ * Returns null if the filename is ambiguous and no column data is provided.
+ */
+function detectTypeFromFilename(filename: string): 'bug' | 'request' | null {
+  const lower = filename.toLowerCase();
+  if (lower.includes('bug')) return 'bug';
+  if (lower.includes('request') || lower.includes('feature') || lower.includes('fr')) return 'request';
+  return null;
+}
+
+/**
+ * Determine ticket type from a CSV row's 'type' or 'issue type' column.
+ */
+function detectTypeFromRow(row: Record<string, string>): 'bug' | 'request' | null {
+  const typeVal = getColumnValue(row, ['type', 'issue type', 'ticket type', 'issuetype']).toLowerCase();
+  if (!typeVal) return null;
+  if (typeVal.includes('bug') || typeVal.includes('defect') || typeVal.includes('error')) return 'bug';
+  if (typeVal.includes('request') || typeVal.includes('feature') || typeVal.includes('story') || typeVal.includes('enhancement')) return 'request';
+  return null;
+}
+
+/**
+ * Deduplicate tickets by key, then by id. Last-seen wins (preserves most complete record).
+ */
+function deduplicateTickets(tickets: JiraTicket[]): JiraTicket[] {
+  const seen = new Map<string, JiraTicket>();
+  for (const ticket of tickets) {
+    const dedupeKey = ticket.key || ticket.id;
+    if (dedupeKey) {
+      seen.set(dedupeKey, ticket);
+    } else {
+      // No stable key — keep as-is using title as approximate dedup
+      seen.set(ticket.title || JSON.stringify(ticket), ticket);
+    }
+  }
+  return Array.from(seen.values());
+}
+
+/**
  * Read and parse CSV files from directory
  */
 export async function readCSVFiles(dataDir: string): Promise<{ bugs: JiraTicket[]; requests: JiraTicket[] }> {
@@ -209,13 +248,17 @@ export async function readCSVFiles(dataDir: string): Promise<{ bugs: JiraTicket[
       const content = await readFile(filePath, 'utf-8');
       const rows = parseCSV(content);
 
-      // Determine type from filename
-      const type: 'bug' | 'request' = file.toLowerCase().includes('bug') ? 'bug' : 'request';
+      const filenameType = detectTypeFromFilename(file);
+      if (filenameType === null) {
+        console.warn(`[csv-reader] Ambiguous filename "${file}" — will determine ticket type from row data (type/issue type column). Files named with "bug", "request", or "feature" are detected automatically.`);
+      }
 
       for (const row of rows) {
-        const ticket = parseJiraTicket(row, type);
+        // Use filename type as default; fall back to row-level type column
+        const rowType = filenameType ?? detectTypeFromRow(row) ?? 'request';
+        const ticket = parseJiraTicket(row, rowType);
         if (ticket.id || ticket.key) {
-          if (type === 'bug') {
+          if (rowType === 'bug') {
             bugs.push(ticket);
           } else {
             requests.push(ticket);
@@ -224,7 +267,18 @@ export async function readCSVFiles(dataDir: string): Promise<{ bugs: JiraTicket[
       }
     }
 
-    return { bugs, requests };
+    // Deduplicate within each category (handles re-exported or overlapping CSVs)
+    const uniqueBugs = deduplicateTickets(bugs);
+    const uniqueRequests = deduplicateTickets(requests);
+
+    if (uniqueBugs.length !== bugs.length) {
+      console.log(`[csv-reader] Deduplication removed ${bugs.length - uniqueBugs.length} duplicate bug tickets`);
+    }
+    if (uniqueRequests.length !== requests.length) {
+      console.log(`[csv-reader] Deduplication removed ${requests.length - uniqueRequests.length} duplicate request tickets`);
+    }
+
+    return { bugs: uniqueBugs, requests: uniqueRequests };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(`Data directory not found: ${dataDir}. Please create it and add CSV files.`);
