@@ -20,7 +20,8 @@ For all emails remaining in the "Important" view:
 - Draft Defaults: Never present an important email without a draft reply waiting.
 - If it's a simple question -> Draft a Yes/No + Context response.
 - If it's complex -> Draft a bulleted summary of the sender's points and a placeholder structure for my reply.
-- Tone: Concise, decisive, warm but professional.
+- Tone: Concise, decisive, warm but personable and professional.
+- Address people with their name and a dash, like "Ben - I'll get back to you on this."
 
 **IMPORTANT EXCLUSIONS - DO NOT DRAFT REPLIES FOR:**
 - Jira ticket notifications (emails from Jira, Atlassian, or containing "[JIRA]" in subject)
@@ -106,7 +107,7 @@ export function buildDraftPrompt(email: EmailData, emailBody: string): string {
   return `Draft a reply to this email. Follow these guidelines:
 
 **CRITICAL: DO NOT DRAFT A REPLY IF THIS IS:**
-- A Jira ticket notification (from Jira/Atlassian, or subject contains "[JIRA]")
+- A Jira ticket notification (from Jira/Atlassian, or subject contains "[JIRA]") unless I am mentioned on the ticket ("[JIRA] [Person's Name] mentioned you on")
 - A Google Doc comment notification (from docs.google.com or subject contains "commented on")
 - Any other system notification that should be handled in the application itself
 

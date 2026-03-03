@@ -151,16 +151,27 @@ Analyzes Jira ticket data from CSV files to generate customer intelligence repor
 - **+1 Endorsement Detection** - Identifies CSM "+1" comments that signal multi-customer demand
 - **Representative Quotes** - Compelling customer feedback with context
 
-Reads CSV files from `./data/jira/` (configurable via `JIRA_DATA_DIR`). Expects files named `bugs-YYYY-MM-DD.csv` and `requests-YYYY-MM-DD.csv`. Reports are saved to `./reports/` directory.
+**Data setup:**
 
-**Preprocessing Jira exports (recommended):** Raw Jira CSV exports contain 600+ columns, most of which are unused. Run the preprocessing script to strip them down to the ~60 useful columns and consolidate the many repeated Comment columns into a single field:
+1. Export CSV files from Jira (bugs/CROs and feature requests)
+2. Preprocess and place them into `./data/jira/` (configurable via `JIRA_DATA_DIR`):
 
 ```bash
-# Preprocess raw exports from Jira before running the agent
-npm run preprocess-csv -- ./data/jira ~/Downloads/bugs-YYYY-MM-DD.csv ~/Downloads/requests-YYYY-MM-DD.csv
+npm run preprocess-csv -- ./data/jira ~/Downloads/bugs-2026-03-02.csv ~/Downloads/requests-2026-03-02.csv
 ```
 
-This typically reduces file size by 30-50% and ensures comment data (including "+1" endorsements) is properly consolidated. Without preprocessing, the agent still works but will use more memory and may lose comment data from raw Jira exports that spread comments across 40-100 duplicate columns.
+3. Filenames must contain `bug` or `request`/`feature` to auto-classify ticket type (e.g. `bugs-2026-03-02.csv`, `requests-2026-03-02.csv`)
+4. Remove old CSV files from `./data/jira/` before each run — the agent loads **all** `.csv` files in the directory
+
+**Run:**
+
+```bash
+npm run dev run customer-intelligence
+```
+
+Reports are saved to `./reports/` (configurable via `JIRA_REPORTS_DIR`).
+
+**Why preprocess?** Raw Jira CSV exports contain 600+ columns, most of which are unused. The preprocessing script strips them down to ~60 useful columns and consolidates the many repeated Comment columns (Jira spreads them across 40-100 duplicate columns) into a single field. This reduces file size by 30-50% and ensures comment data — including "+1" CSM endorsements — is properly preserved.
 
 ### hubspot-reviewer
 Reviews HubSpot data to identify key reasons for deal losses. Currently a placeholder - HubSpot API integration to be implemented.
